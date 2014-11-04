@@ -466,7 +466,10 @@ static int ssl23_client_hello(SSL *s)
 			{
 			/* create Client Hello in SSL 3.0/TLS 1.0 format */
 
-			/* do the record header (5 bytes) and handshake message header (4 bytes) last */
+			/* do the record header (5 bytes) and handshake message
+			 * header (4 bytes) last. Note: the final argument to
+			 * ssl_add_clienthello_tlsext below depends on the size
+			 * of this prefix. */
 			d = p = &(buf[9]);
 			
 			*(p++) = version_major;
@@ -523,7 +526,10 @@ static int ssl23_client_hello(SSL *s)
 				SSLerr(SSL_F_SSL23_CLIENT_HELLO,SSL_R_CLIENTHELLO_TLSEXT);
 				return -1;
 				}
-			if ((p = ssl_add_clienthello_tlsext(s, p, buf+SSL3_RT_MAX_PLAIN_LENGTH)) == NULL)
+			/* The buffer includes the 5 byte record header, so
+			 * subtract it to compute hlen for
+			 * ssl_add_clienthello_tlsext. */
+			if ((p = ssl_add_clienthello_tlsext(s, p, buf+SSL3_RT_MAX_PLAIN_LENGTH, p-buf-5)) == NULL)
 				{
 				SSLerr(SSL_F_SSL23_CLIENT_HELLO,ERR_R_INTERNAL_ERROR);
 				return -1;
@@ -714,6 +720,9 @@ static int ssl23_get_server_hello(SSL *s)
 			SSLerr(SSL_F_SSL23_GET_SERVER_HELLO,SSL_R_UNSUPPORTED_PROTOCOL);
 			goto err;
 			}
+
+		/* ensure that TLS_MAX_VERSION is up-to-date */
+		OPENSSL_assert(s->version <= TLS_MAX_VERSION);
 
 		if (p[0] == SSL3_RT_ALERT && p[5] != SSL3_AL_WARNING)
 			{
